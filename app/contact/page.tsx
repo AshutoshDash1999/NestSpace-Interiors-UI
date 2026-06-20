@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Mail, Phone, MapPin, Clock, Send } from "lucide-react"
+import { CopyButton } from "@/components/copy-button"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -23,34 +24,68 @@ const contactInfo = [
     label: "Email",
     value: "hello@nestspace.com",
     href: "mailto:hello@nestspace.com",
+    copyable: true,
   },
   {
     icon: Phone,
     label: "Phone",
     value: "+1 (234) 567-890",
     href: "tel:+1234567890",
+    copyable: false,
   },
   {
     icon: MapPin,
     label: "Address",
     value: "123 Design Street, Creative District, NY 10001",
     href: "#map",
+    copyable: false,
   },
   {
     icon: Clock,
     label: "Hours",
     value: "Mon - Fri: 9AM - 6PM",
     href: null,
+    copyable: false,
   },
 ]
 
 export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [service, setService] = useState("")
+  const [budget, setBudget] = useState("")
+  const [errors, setErrors] = useState<{ service?: string; budget?: string }>({})
+  const formRef = useRef<HTMLFormElement>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validate Select fields (native inputs are handled by the browser `required`)
+    const newErrors: { service?: string; budget?: string } = {}
+    if (!service) newErrors.service = "Please select a service."
+    if (!budget) newErrors.budget = "Please select a budget range."
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
+
+    setErrors({})
     setIsSubmitting(true)
+
+    // Collect all form field values
+    const form = formRef.current!
+    const formData = {
+      firstName: (form.elements.namedItem("firstName") as HTMLInputElement).value,
+      lastName:  (form.elements.namedItem("lastName")  as HTMLInputElement).value,
+      email:     (form.elements.namedItem("email")     as HTMLInputElement).value,
+      phone:     (form.elements.namedItem("phone")     as HTMLInputElement).value,
+      service,
+      budget,
+      message:   (form.elements.namedItem("message")   as HTMLTextAreaElement).value,
+    }
+    console.log("Contact form submission:", formData)
+
     // Simulate form submission
     await new Promise(resolve => setTimeout(resolve, 1500))
     setIsSubmitting(false)
@@ -98,16 +133,21 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">{item.label}</p>
-                      {item.href ? (
-                        <a
-                          href={item.href}
-                          className="font-medium text-foreground hover:text-primary transition-colors"
-                        >
-                          {item.value}
-                        </a>
-                      ) : (
-                        <p className="font-medium text-foreground">{item.value}</p>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {item.href ? (
+                          <a
+                            href={item.href}
+                            className="font-medium text-foreground hover:text-primary transition-colors"
+                          >
+                            {item.value}
+                          </a>
+                        ) : (
+                          <p className="font-medium text-foreground">{item.value}</p>
+                        )}
+                        {item.copyable && (
+                          <CopyButton text={item.value} label="email address" />
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -137,7 +177,7 @@ export default function ContactPage() {
                       </Button>
                     </div>
                   ) : (
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
                       <div className="grid md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                           <Label htmlFor="firstName">First Name</Label>
@@ -182,9 +222,18 @@ export default function ContactPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="service">Service Interested In</Label>
-                        <Select>
-                          <SelectTrigger className="bg-background">
+                        <Label htmlFor="service">Service Interested In *</Label>
+                        <Select
+                          value={service}
+                          onValueChange={(val) => {
+                            setService(val)
+                            if (errors.service) setErrors(prev => ({ ...prev, service: undefined }))
+                          }}
+                        >
+                          <SelectTrigger
+                            id="service"
+                            className={`bg-background${errors.service ? " border-destructive focus:ring-destructive" : ""}`}
+                          >
                             <SelectValue placeholder="Select a service" />
                           </SelectTrigger>
                           <SelectContent>
@@ -195,12 +244,24 @@ export default function ContactPage() {
                             <SelectItem value="other">Other</SelectItem>
                           </SelectContent>
                         </Select>
+                        {errors.service && (
+                          <p className="text-sm text-destructive">{errors.service}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="budget">Estimated Budget</Label>
-                        <Select>
-                          <SelectTrigger className="bg-background">
+                        <Label htmlFor="budget">Estimated Budget *</Label>
+                        <Select
+                          value={budget}
+                          onValueChange={(val) => {
+                            setBudget(val)
+                            if (errors.budget) setErrors(prev => ({ ...prev, budget: undefined }))
+                          }}
+                        >
+                          <SelectTrigger
+                            id="budget"
+                            className={`bg-background${errors.budget ? " border-destructive focus:ring-destructive" : ""}`}
+                          >
                             <SelectValue placeholder="Select budget range" />
                           </SelectTrigger>
                           <SelectContent>
@@ -211,6 +272,9 @@ export default function ContactPage() {
                             <SelectItem value="over-250k">Over $250,000</SelectItem>
                           </SelectContent>
                         </Select>
+                        {errors.budget && (
+                          <p className="text-sm text-destructive">{errors.budget}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
